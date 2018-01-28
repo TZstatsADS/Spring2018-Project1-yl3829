@@ -1,0 +1,220 @@
+---
+title: "Project1"
+runtime: shiny
+output:
+  html_document: default
+  html_notebook: default
+---
+
+# Topic
+We want to see how speech on time scale would be related or different. 
+In the exploration below, we applied LSA and LDA and found that the speech is actually quite relavent with time in the form of latent sentiment and topics clustering. 
+In the end we discovered that President Trump's speech is quite different from his recent predecessors, which also confirms the fact that President Trump has a different background, values and action.
+
+# Step 0 - load package
+```{r}
+packages_need <- c('xlsx','tm','magrittr','topicmodels','factoextra','Rtsne',
+                  'ggplot2','akmeans','shiny','wordcloud','tydytext')
+
+packages_install <- setdiff(packages_need, 
+                        intersect(installed.packages()[,1], 
+                                  packages_need))
+
+if(length(packages_install)>0){
+  install.packages(packages_install, dependencies = TRUE,
+                   repos='http://cran.us.r-project.org')
+}
+
+library(xlsx)
+library(tm)
+library(magrittr)
+library(topicmodels)
+library(factoextra)
+library(Rtsne)
+library(ggplot2)
+library(akmeans)
+library(shiny)
+library(wordcloud)
+library(tidytext)
+```
+
+
+
+# Step 1 - Read in the speeches
+```{r  warning=FALSE}
+path <- '../data/InauguralSpeeches/'
+speech_list <- read.xlsx('../data/InaugurationInfo.xlsx',sheetIndex = 1)
+speech_date <- read.csv('../data/InauguationDates.txt',sep='\t')
+speech_list$President <- as.character(tolower(speech_list$President)) # turn all names into lower case
+speech_date$PRESIDENT <- as.character(tolower(speech_date$PRESIDENT)) # turn all names into lower case
+
+# Since speech_date and speech_list have some different names format,
+# We need to change some of them by hand.
+speech_date$PRESIDENT[speech_date$PRESIDENT=='james knox polk'] <- 'james k. polk'
+speech_date$PRESIDENT[speech_date$PRESIDENT=='james a. garfield'] <- 'james garfield'
+speech_date$PRESIDENT[speech_date$PRESIDENT=='grover cleveland'] <- c('grover cleveland - i',
+                                                                      'grover cleveland - ii')
+speech_date$PRESIDENT[speech_date$PRESIDENT=='richard m. nixon'] <- 'richard nixon'
+
+# load American histroy timeline
+# from wikipedia
+timeline <- read.csv('../output/American history timeline.csv')
+timeline$start <- as.Date(timeline$start,format='%m/%d/%Y')
+timeline$end <- as.Date(timeline$end,format='%m/%d/%Y')
+
+# Math the text and dates to the speech list
+speech_list$Text <- ''
+speech_list$Date <- ''
+speech_list$Period <- ''
+for (i in 1:nrow(speech_list)){
+  text_path <- paste0(path,'inaug',speech_list$File[i],'-',speech_list$Term[i],'.txt')
+  speech_list$Text[i] <- readLines(text_path,warn = FALSE,encoding = 'utf-8')
+  spc_date <- speech_date[speech_date$PRESIDENT==speech_list$President[i],
+                                                  speech_list$Term[i]+1]
+  speech_list$Date[i] <- as.character(spc_date)
+  spc_date <- as.Date(spc_date,format='%m/%d/%Y')
+  speech_list$Period[i] <- as.character(timeline$Period[spc_date>=timeline$start&
+                                          spc_date<=timeline$end])
+}
+```
+
+# Step 2 - Data Cleaning
+```{r}
+speech_list$Text <- gsub("[[:punct:]]",' ',speech_list$Text) # remove punctuation
+speech_list$Text <-  
+  tolower(speech_list$Text)%>% # turn into lower case
+  removeWords(words=stopwords("english"))%>% # remove stopwords
+  removeWords(words=character(0))%>% # remove blank word
+  stripWhitespace()#%>% # remove extra space
+  #stemDocument() # keep the word stem only
+
+
+```
+
+# Step 3 - Construct Corpus and document-term matrices
+```{r}
+docs <- Corpus(VectorSource(speech_list$Text))
+writeLines(substr(as.character(docs[10]),1,152)) # show a text sample in corpus after cleaning
+
+#dtm <-  DocumentTermMatrix(docs)
+
+# applied tf-idf to represent a doc and get the documentterm matrix.
+dtm <- DocumentTermMatrix(docs,
+                          control = list(weighting = function(x)
+                                             weightTfIdf(x, 
+                                                         normalize =FALSE),
+                                         stopwords = TRUE))
+
+
+# rematch the matrix to the inaugnation 
+rownames(dtm) <- paste(speech_list$File,speech_list$Term, sep = '_')
+```
+
+# Step 4 - Latent Sentiment Analysis
+more about LSA pleas refer to https://en.wikipedia.org/wiki/Latent_semantic_analysis
+```{r, fig.width=6, fig.height=6}
+matrix_tf_idf <- as.matrix(dtm) # get the matrix
+s <- svd(matrix_tf_idf) # applied svd for LSA
+D <- diag(s$d) 
+lsaOut <- as.data.frame(D%*%t(s$v)) # a new representation of the docs; dim = (58,wordscount)
+```
+
+visualization LSA result: t-sne
+refer to: https://en.wikipedia.org/wiki/T-distributed_stochastic_neighbor_embedding
+Visualize high dimensional data to a lower dimension
+```{r}
+tsne <‐ Rtsne(lsaOut, dims = 2, perplexity=15, verbose=TRUE, max_iter = 1200,pca = FALSE)
+plot_df <- cbind(as.data.frame(tsne$Y),as.Date(speech_list$Date,format='%m/%d/%Y'))
+names(plot_df) <- c('dim1','dim2','Date')
+ggplot(plot_df)+
+  geom_point(mapping=aes(x=dim1,y=dim2,color=Date))
+```
+From the graph we could see that more recent(lighter in color) the speech is made more close to the origin(in t-sne the location is not important, what matters is their relative position). It can be bellieve that the latent sentiment of speeches have a trend in recent time, but, in histroy, the topic the main idea of an article could be different, like in the topic in civil war and in WWII should be not the same.
+
+To see more about this we could plot out the wordcloud in different period.
+
+Interactive visualize important words in different period
+```{r}
+Period <- as.character(timeline$Period)
+shinyApp(
+    ui = fluidPage(
+      fluidRow(style = "padding-bottom: 20px;",
+        column(4, selectInput('period', 'Period', Period , selected=Period[1] )),
+        column(4, sliderInput('nwords', 'Number of words', 3, min = 20, 
+                              max = 200, value=100, step = 20))
+      ),
+      fluidRow(
+        plotOutput('wordclouds', height = "400px")
+      )
+    ),
+
+    server = function(input, output, session) {
+      # Combine the selected variables into a new data frame
+      selectedData <- reactive({
+        list(dtm.term=tidy(dtm[speech_list$Period==input$period,])$term,
+             dtm.count=tidy(dtm[speech_list$Period==input$period,])$count
+             )
+      })
+
+      output$wordclouds <- renderPlot(height = 400, {
+        par(mfrow=c(1,1), mar = c(0, 0, 3, 0))
+        wordcloud(selectedData()$dtm.term, 
+                  selectedData()$dtm.count,
+              scale=c(4,0.5),
+              max.words=input$nwords,
+              min.freq=1,
+              random.order=FALSE,
+              rot.per=0,
+              use.r.layout=FALSE,
+              random.color=FALSE,
+              colors=brewer.pal(10,"Blues"), 
+            main=input$speech1)
+      })
+    },
+
+    options = list(height = 600)
+)
+
+```
+
+
+# Step 6 - LDA
+To see more about how the speeches' relavance and difference, we could cluster on the topics the speech mainly about.
+
+Topic model training
+```{r}
+dtm <- DocumentTermMatrix(docs) # use word counts as the elements of the matrix 
+burnin <- 4000
+iter <- 2000
+thin <- 500
+seed <-list(2003,5,63,100001,765)
+nstart <- 5
+best <- TRUE
+
+#Number of topics
+k <- 10
+
+#Run LDA using Gibbs sampling
+ldaOut <-LDA(dtm, k, method="Gibbs", control=list(nstart=nstart, 
+                                                 seed = seed, best=best,
+                                                 burnin = burnin, iter = iter, 
+                                                 thin=thin))
+
+ldaOut.terms <- as.matrix(terms(ldaOut,10))
+ldaOut.terms
+```
+
+Adaptive kmeans
+```{r}
+set.seed(5)
+# apply adaptive kmeans where number of cluster is not given
+# here we use cosin distance instead of euclidean metric
+akm.res <- akmeans(ldaOut@gamma,mode = 3,d.metric = 2, min.k=2) 
+
+# plot out the result
+fviz_cluster(list(data=ldaOut@gamma,cluster=akm.res$cluster), 
+             stand=F, repel= TRUE,
+             data =ldaOut@gamma , xlab="", xaxt="n",
+             show.clust.cent=FALSE)
+```
+From the graph abov we could see that the cluster is mostly based on time, the smaller the number the older the speech is made. Cluster 2 is the oldest on and then cluster 1, cluster 3 and cluster 4. Also, we could find that the 58 speech is on the edge of cluster 3 which indicates that, President Trump's inaugnation speech is qiute different from his recet predecessors.
