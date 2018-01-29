@@ -9,7 +9,7 @@ This is the first and only *individual* (as opposed to *team*) this semester.
 Term: Spring 2018
 
 + Projec title: Time vs Inaugural speech
-+ This project is conducted by Yanjjun Lin
++ This project is conducted by Yanjun Lin
 
 + Project summary: 
 We want to see how inaugural speech on time scale would be related or different. 
