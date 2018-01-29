@@ -7,8 +7,8 @@ output:
 ---
 
 # Topic
-We want to see how speech on time scale would be related or different. 
-In the exploration below, we applied LSA and LDA and found that the speech is actually quite relavent with time in the form of latent sentiment and topics clustering. 
+We want to see how inaugural speech on time scale would be related or different. 
+In the exploration below, we applied LSA and LDA and found that the speech is actually quite relevant with time in the form of latent sentiment and topics clustering. 
 In the end we discovered that President Trump's speech is quite different from his recent predecessors, which also confirms the fact that President Trump has a different background, values and action.
 
 # Step 0 - load package
@@ -129,9 +129,9 @@ names(plot_df) <- c('dim1','dim2','Date')
 ggplot(plot_df)+
   geom_point(mapping=aes(x=dim1,y=dim2,color=Date))
 ```
-From the graph we could see that more recent(lighter in color) the speech is made more close to the origin(in t-sne the location is not important, what matters is their relative position). It can be bellieve that the latent sentiment of speeches have a trend in recent time, but, in histroy, the topic the main idea of an article could be different, like in the topic in civil war and in WWII should be not the same.
+From the graph we could see that more recent(lighter in color) the speech is made more close to the origin(in t-sne the location is not important, what matters is their relative position). It can be believed that the latent sentiment of speeches have a trend in recent time, but, in history, the topic the main idea of an article could be different, like in the topic in civil war and in WWII should be not the same.
 
-To see more about this we could plot out the wordcloud in different period.
+To see more about this we could plot out the word-cloud in different period.
 
 Interactive visualize important words in different period
 ```{r}
@@ -179,7 +179,7 @@ shinyApp(
 
 
 # Step 6 - LDA
-To see more about how the speeches' relavance and difference, we could cluster on the topics the speech mainly about.
+To see more about how the speeches' relevance and difference, we could cluster on the topics the speech mainly about.
 
 Topic model training
 ```{r}
@@ -217,4 +217,4 @@ fviz_cluster(list(data=ldaOut@gamma,cluster=akm.res$cluster),
              data =ldaOut@gamma , xlab="", xaxt="n",
              show.clust.cent=FALSE)
 ```
-From the graph abov we could see that the cluster is mostly based on time, the smaller the number the older the speech is made. Cluster 2 is the oldest on and then cluster 1, cluster 3 and cluster 4. Also, we could find that the 58 speech is on the edge of cluster 3 which indicates that, President Trump's inaugnation speech is qiute different from his recet predecessors.
+From the graph above we could see that the cluster is mostly based on time, the smaller the number the older the speech is made. Cluster 2 is the oldest on and then cluster 1, cluster 3 and cluster 4. Also, we could find that the 58 speech is on the edge of cluster 3 which indicates that, President Trump's inauguration speech is quite different from his recent predecessors.
