@@ -9,7 +9,7 @@ output:
   
 # Abstract
 We want to see does inaugural speeches evolve over time. If so, then how inaugural speech on time scale would be related or different. Will there be a trend of these speeches over time?   
-In the exploration below, we applied LSA and LDA and found that the speeches are actually quite relevant with time in the form of latent sentiment and topics clustering. We could see there is trend in the recent speeches from the result of LSA. In the end we also discovered that President Trump's speech is quite different from his recent predecessors, which also confirms the fact that President Trump has a different background, values, action as well as the way he makes speeches.
+In the exploration below, we applied LSA and LDA and found that the speeches are actually quite relevant with time in the form of latent semanteme and topics clustering. We could see there is trend in the recent speeches from the result of LSA. In the end we also discovered that President Trump's speech is quite different from his recent predecessors, which also confirms the fact that President Trump has a different background, values, action as well as the way he makes speeches.
 
 # Step 0 - load package
 ```{r message=FALSE, warning=FALSE}
@@ -112,7 +112,7 @@ dtm <- DocumentTermMatrix(docs,
 rownames(dtm) <- paste(speech_list$File,speech_list$Term, sep = '_')
 ```
 
-# Step 4 - Latent Sentiment Analysis
+# Step 4 - Latent Semantic Analysis
 LSA assumes that words that are close in meaning will occur in similar pieces of text (the distributional hypothesis).
 more about LSA pleas refer to https://en.wikipedia.org/wiki/Latent_semantic_analysis
 ## LSA
@@ -227,4 +227,4 @@ fviz_cluster(list(data=ldaOut@gamma,cluster=akm.res$cluster),
              show.clust.cent=FALSE)
 ```
 
-From the graph above we could see that the cluster is also mostly based on time, the smaller the number the older the speech is made. Cluster 1 is the oldest one and then cluster 2, cluster 3 and cluster 4. Also, we could find that the 58 speech is on the edge of cluster 3 which indicates that, President Trump's inauguration speech is quite different from his recent predecessors.
+The numbers in the graph correspond to the order in time of the inaugural speech. From the graph above we could see that the cluster is also mostly based on time, the smaller the number the older the speech is made. Cluster 1 is the oldest one and then cluster 2, cluster 3 and cluster 4. Also, we could find that the 58 speech is on the edge of cluster 3 which indicates that, President Trump's inauguration speech is quite different from his recent predecessors.
