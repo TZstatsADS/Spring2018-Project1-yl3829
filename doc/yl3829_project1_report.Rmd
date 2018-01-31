@@ -1,18 +1,18 @@
 ---
-title: "Project1"
-runtime: shiny
+title: "Does inaugural speeches evolve over time?"
+author: Yanjun Lin, YL3829
 output:
   html_document: default
   html_notebook: default
 ---
 
-# Topic
-We want to see how inaugural speech on time scale would be related or different. 
-In the exploration below, we applied LSA and LDA and found that the speech is actually quite relevant with time in the form of latent sentiment and topics clustering. 
-In the end we discovered that President Trump's speech is quite different from his recent predecessors, which also confirms the fact that President Trump has a different background, values and action.
+  
+# Abstract
+We want to see does inaugural speeches evolve over time. If so, then how inaugural speech on time scale would be related or different. Will there be a trend of these speeches over time?   
+In the exploration below, we applied LSA and LDA and found that the speeches are actually quite relevant with time in the form of latent sentiment and topics clustering. We could see there is trend in the recent speeches from the result of LSA. In the end we also discovered that President Trump's speech is quite different from his recent predecessors, which also confirms the fact that President Trump has a different background, values, action as well as the way he makes speeches.
 
 # Step 0 - load package
-```{r}
+```{r message=FALSE, warning=FALSE}
 packages_need <- c('xlsx','tm','magrittr','topicmodels','factoextra','Rtsne',
                   'ggplot2','akmeans','shiny','wordcloud','tydytext')
 
@@ -56,13 +56,15 @@ speech_date$PRESIDENT[speech_date$PRESIDENT=='grover cleveland'] <- c('grover cl
                                                                       'grover cleveland - ii')
 speech_date$PRESIDENT[speech_date$PRESIDENT=='richard m. nixon'] <- 'richard nixon'
 
-# load American histroy timeline
-# from wikipedia
+# load American histroy timeline, there are 9 major period in the American History, after Declaration
+# of independence. They are federal period, industrialization and slavery, civil war, reconstruction 
+# and progressive, WWI, boom and bust, WWII, postwar, present.
+# Dates and period are from wikipedia.
 timeline <- read.csv('../output/American history timeline.csv')
 timeline$start <- as.Date(timeline$start,format='%m/%d/%Y')
 timeline$end <- as.Date(timeline$end,format='%m/%d/%Y')
 
-# Math the text and dates to the speech list
+# Match the text, dates nad peroid to the speech list
 speech_list$Text <- ''
 speech_list$Date <- ''
 speech_list$Period <- ''
@@ -78,20 +80,20 @@ for (i in 1:nrow(speech_list)){
 }
 ```
 
-# Step 2 - Data Cleaning
+# Step 2 - Data 
+Remove irrelevant words and put words into the same format.
 ```{r}
 speech_list$Text <- gsub("[[:punct:]]",' ',speech_list$Text) # remove punctuation
 speech_list$Text <-  
   tolower(speech_list$Text)%>% # turn into lower case
   removeWords(words=stopwords("english"))%>% # remove stopwords
   removeWords(words=character(0))%>% # remove blank word
-  stripWhitespace()#%>% # remove extra space
-  #stemDocument() # keep the word stem only
-
-
+  stripWhitespace() # remove extra space
+  
 ```
 
 # Step 3 - Construct Corpus and document-term matrices
+Here we need tf-idf dtm for LSA.
 ```{r}
 docs <- Corpus(VectorSource(speech_list$Text))
 writeLines(substr(as.character(docs[10]),1,152)) # show a text sample in corpus after cleaning
@@ -111,29 +113,34 @@ rownames(dtm) <- paste(speech_list$File,speech_list$Term, sep = '_')
 ```
 
 # Step 4 - Latent Sentiment Analysis
+LSA assumes that words that are close in meaning will occur in similar pieces of text (the distributional hypothesis).
 more about LSA pleas refer to https://en.wikipedia.org/wiki/Latent_semantic_analysis
+## LSA
 ```{r, fig.width=6, fig.height=6}
 matrix_tf_idf <- as.matrix(dtm) # get the matrix
 s <- svd(matrix_tf_idf) # applied svd for LSA
-D <- diag(s$d) 
-lsaOut <- as.data.frame(D%*%t(s$v)) # a new representation of the docs; dim = (58,wordscount)
+D <- diag(s$d,dim(matrix_tf_idf)[1],dim(matrix_tf_idf)[2]) 
+lsaOut <- as.data.frame(s$u%*%D) # a new representation of the docs; dim = (58,wordscount)
 ```
 
-visualization LSA result: t-sne
+## visualization LSA result: t-sne
 refer to: https://en.wikipedia.org/wiki/T-distributed_stochastic_neighbor_embedding
 Visualize high dimensional data to a lower dimension
 ```{r}
-tsne <‐ Rtsne(lsaOut, dims = 2, perplexity=15, verbose=TRUE, max_iter = 1200,pca = FALSE)
+set.seed(30) # to fix the result of t-sne.
+# Here we just use the first 50 dimension of the LSA result to save runtime,
+# while it provide more than 90% of the information.
+tsne <‐ Rtsne(lsaOut[,1:50], dims = 2, perplexity=15, verbose=TRUE, max_iter = 1200,pca = FALSE)
 plot_df <- cbind(as.data.frame(tsne$Y),as.Date(speech_list$Date,format='%m/%d/%Y'))
 names(plot_df) <- c('dim1','dim2','Date')
 ggplot(plot_df)+
   geom_point(mapping=aes(x=dim1,y=dim2,color=Date))
 ```
-From the graph we could see that more recent(lighter in color) the speech is made more close to the origin(in t-sne the location is not important, what matters is their relative position). It can be believed that the latent sentiment of speeches have a trend in recent time, but, in history, the topic the main idea of an article could be different, like in the topic in civil war and in WWII should be not the same.
+In the graph, we could found that the lighter points (more recent speeches) and the dark points (older speeches) are in different position. If we set some break point in the time, based on the graph, we could easily separate the points of different period speeches. Note that, for t-sne, the absolute position is meatless, but the relative positions of the points matter. This shows that the speeches are actually evolved over time and there is a trend in inaugural speeches.
 
-To see more about this we could plot out the word-cloud in different period.
+To see more about the trend we could plot out the word-cloud in different time period in America history.
 
-Interactive visualize important words in different period
+##Interactive visualize important words in different period.
 ```{r}
 Period <- as.character(timeline$Period)
 shinyApp(
@@ -179,9 +186,9 @@ shinyApp(
 
 
 # Step 6 - LDA
-To see more about how the speeches' relevance and difference, we could cluster on the topics the speech mainly about.
+To see more about the speeches' relevance and difference, we could cluster on the topics of what the speeches are mainly about. Here we need LDA to obtain the topic distribution of each speech.
 
-Topic model training
+##Topic model training
 ```{r}
 dtm <- DocumentTermMatrix(docs) # use word counts as the elements of the matrix 
 burnin <- 4000
@@ -203,8 +210,10 @@ ldaOut <-LDA(dtm, k, method="Gibbs", control=list(nstart=nstart,
 ldaOut.terms <- as.matrix(terms(ldaOut,10))
 ldaOut.terms
 ```
+Here is the top word in each topic. But here we do not need care too much about the the topics are about. We just need the topic as a new representation of documents, then we could cluster based on the topic distribution.  
 
-Adaptive kmeans
+##Adaptive kmeans
+Adaptive kmeans is a variant of kmeans, which does not require a given number of cluster. It could 
 ```{r}
 set.seed(5)
 # apply adaptive kmeans where number of cluster is not given
@@ -217,4 +226,4 @@ fviz_cluster(list(data=ldaOut@gamma,cluster=akm.res$cluster),
              data =ldaOut@gamma , xlab="", xaxt="n",
              show.clust.cent=FALSE)
 ```
-From the graph above we could see that the cluster is mostly based on time, the smaller the number the older the speech is made. Cluster 2 is the oldest on and then cluster 1, cluster 3 and cluster 4. Also, we could find that the 58 speech is on the edge of cluster 3 which indicates that, President Trump's inauguration speech is quite different from his recent predecessors.
+From the graph above we could see that the cluster is also mostly based on time, the smaller the number the older the speech is made. Cluster 2 is the oldest one and then cluster 1, cluster 3 and cluster 4. Also, we could find that the 58 speech is on the edge of cluster 3 which indicates that, President Trump's inauguration speech is quite different from his recent predecessors.
