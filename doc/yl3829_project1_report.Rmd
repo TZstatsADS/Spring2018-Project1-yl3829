@@ -215,15 +215,16 @@ Here is the top word in each topic. But here we do not need care too much about 
 ##Adaptive kmeans
 Adaptive kmeans is a variant of kmeans, which does not require a given number of cluster. It could 
 ```{r}
-set.seed(5)
+set.seed(1)
 # apply adaptive kmeans where number of cluster is not given
 # here we use cosin distance instead of euclidean metric
 akm.res <- akmeans(ldaOut@gamma,mode = 3,d.metric = 2, min.k=2) 
 
 # plot out the result
 fviz_cluster(list(data=ldaOut@gamma,cluster=akm.res$cluster), 
-             stand=F, repel= TRUE,
-             data =ldaOut@gamma , xlab="", xaxt="n",
+             repel= TRUE,
+             data =ldaOut@gamma, xlab="", xaxt="n",
              show.clust.cent=FALSE)
 ```
-From the graph above we could see that the cluster is also mostly based on time, the smaller the number the older the speech is made. Cluster 2 is the oldest one and then cluster 1, cluster 3 and cluster 4. Also, we could find that the 58 speech is on the edge of cluster 3 which indicates that, President Trump's inauguration speech is quite different from his recent predecessors.
+
+From the graph above we could see that the cluster is also mostly based on time, the smaller the number the older the speech is made. Cluster 1 is the oldest one and then cluster 2, cluster 3 and cluster 4. Also, we could find that the 58 speech is on the edge of cluster 3 which indicates that, President Trump's inauguration speech is quite different from his recent predecessors.
